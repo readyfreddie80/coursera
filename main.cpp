@@ -1,3 +1,4 @@
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -14,95 +15,74 @@ void Reverse(vector<int>& v) {
 #define newCmd(cmd) {#cmd, cmd}
 
 enum cmdsNum {
-    ADD,
-    DUMP,
-    NEXT
+    NEW_BUS,
+    BUSES_FOR_STOP,
+    STOPS_FOR_BUS,
+    ALL_BUSES
 };
 
-
-struct ToDoList {
-private:
-    vector<vector<string>> toDoList;
-    vector<size_t> numbOfDates;
-    size_t currMonth;
-
-
-    void resizeToDoList(size_t month) {
-        toDoList.resize(numbOfDates[month]);
+void PrintVector(const vector<string>& v, char splitter) {
+    for (const auto& s : v) {
+        cout << s << splitter;
     }
-    size_t getNextMonth() {
-        return (currMonth + 1) % 12;
-    }
+}
 
-
-
-public:
-    ToDoList() {
-        currMonth = 0;
-        numbOfDates.assign(12, 31);
-        numbOfDates[1] = 28;
-        for(int i = 3; i < 12; i+=2) {
-            numbOfDates[i] = 30;
-        }
-        resizeToDoList(currMonth);
-    }
-
-    void nextMonth() {
-        size_t nxtMnt = getNextMonth();
-        for (int i = numbOfDates[nxtMnt], j = i - 1; i < numbOfDates[currMonth]; ++i) {
-             toDoList[j].insert(end(toDoList[j]), begin(toDoList[i]), end(toDoList[i]));
-        }
-        currMonth = nxtMnt;
-        resizeToDoList(currMonth);
-    }
-
-    void addTask(size_t date, string task) {
-        assert(date > 0);
-        assert(date <= toDoList.size());
-        toDoList[date - 1].push_back(task);
-    }
-
-    void dumpTasks(size_t date) {
-        assert(date > 0);
-        size_t inxDate = date - 1;
-        assert(inxDate < toDoList.size());
-
-        cout << toDoList[inxDate].size() << " ";
-        for (const auto& task : toDoList[inxDate]) {
-            cout << task << " ";
-        }
-        cout << endl;
-    }
-};
 
 int main() {
     int Q = 0;
     cin >> Q;
 
-    map<string, size_t> cmds = {newCmd(ADD),
-                                newCmd(DUMP),
-                                newCmd(NEXT)};
+    map<string, size_t> cmds = {newCmd(NEW_BUS),
+                                newCmd(BUSES_FOR_STOP),
+                                newCmd(STOPS_FOR_BUS),
+                                newCmd(ALL_BUSES)};
 
-    string  currCmd;
-    size_t date;
-    string task;
-    ToDoList tdlist;
+    map<string, vector<string>> busesForStops;
+    map<string, vector<string>> stopsForBuses;
+    string stop, bus;
     while (Q--) {
+        string currCmd;
         cin >> currCmd;
 
         switch (cmds[currCmd]) {
-            case ADD:
-                cin >> date >> task;
-                tdlist.addTask(date, task);
-                break;
-            case DUMP:
-                cin >> date;
-                tdlist.dumpTasks(date);
-            case NEXT:
-                tdlist.nextMonth();
-            default :
-                break;
-        }
+            case NEW_BUS:
+                int stopsCnt;
+                cin >> stopsCnt >> bus;
 
+                while (stopsCnt--) {
+                    cin >> stop;
+                    stopsForBuses[bus].push_back(stop);
+                    busesForStops[stop].push_back(bus);
+                }
+                break;
+            case BUSES_FOR_STOP:
+                cin >> stop;
+                if (busesForStops.count(stop) == 0) {
+                    cout << "No stop" << endl;
+                } else {
+                    PrintVector(busesForStops[stop], '\n');
+                }
+                break;
+            case STOPS_FOR_BUS:
+                cin >> bus;
+                if (stopsForBuses.count(bus) == 0) {
+                    cout << "No bus" << endl;
+                } else {
+                    PrintVector(stopsForBuses[bus], '\n');
+                }
+                break;
+            case ALL_BUSES:
+                if (stopsForBuses.empty()) {
+                    cout << "No buses" << endl;
+                } else {
+                    for (const auto &item : stopsForBuses) {
+                        cout << item.first << ": ";
+                        PrintVector(item.second, ' ');
+                    }
+                    break;
+                    default :
+                        break;
+                }
+        }
     }
 }
