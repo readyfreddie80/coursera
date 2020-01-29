@@ -39,6 +39,14 @@ class Date {
 public:
 
     Date (Year y = Year(1), Month m = Month(1), Day d = Day(1)) {
+        if (m.month < 1 || m.month > 12) {
+            throw runtime_error("Month value is invalid: " + to_string(m.month));
+        }
+
+        if (d.day < 1 || d.day > 31) {
+            throw runtime_error("Day value is invalid: " + to_string(d.day));
+        }
+
         year  = y.year;
         month = m.month;
         day   = d.day;
@@ -62,12 +70,23 @@ private:
 
 
 istream& operator >> (istream& stream, Date& date) {
+    string strdate;
+
+    stream >> strdate;
+
+    stringstream new_stream;
+
+    new_stream << strdate;
+
     int d = 0, m = 0, y = 0;
-    stream >> y;
-    stream.ignore(1);
-    stream >> m;
-    stream.ignore(1);
-    stream >> d;
+    char c1, c2;
+
+    new_stream >> y >> c1 >> m >> c2 >> d;
+    if (!new_stream                ||
+        c1 != '-' || c2 != '-' ||
+        new_stream.peek() != EOF) {
+        throw runtime_error("Wrong date format: " + strdate);
+    }
 
     date = {Year(y), Month(m), Day(d)};
 
@@ -160,56 +179,62 @@ int main() {
     Database db;
 
     string command;
+    try {
+        while (getline(cin, command)) {
 
-    while (getline(cin, command)) {
+            if (command.empty()) {
+                continue;
+            }
 
-        if (command.empty()) {
-            continue;
-        }
+            stringstream stream;
+            stream << command;
 
-        stringstream stream;
-        stream << command;
+            Date date;
+            string event;
+            stream >> command;
 
-        stream >> command;
+            if (command == "Add" ||
+                command == "Del" ||
+                command == "Find") {
+                stream >> date >> event;
 
-        Date date;
-        string event;
+                if (command == "Add") {
 
-        if (command == "Add") {
-            stream >> date >> event;
+                    db.AddEvent(date, event);
 
-            db.AddEvent(date, event);
+                } else if (command == "Del") {
 
-        } else if (command == "Del") {
-            stream >> date >> event;
+                    if (event.empty()) {
+                        cout << "Deleted "
+                             << db.DeleteDate(date)
+                             << " events" << endl;
 
-            if (event.empty()) {
-                if (db.DeleteDate(date)) {
-                    cout << "Deleted successfully" << endl;
+                    } else {
+
+                        if (db.DeleteEvent(date, event)) {
+                            cout << "Deleted successfully" << endl;
+                        } else {
+                            cout << "Event not found" << endl;
+                        }
+                    }
+
+                } else if (command == "Find") {
+
+                    set<string> events = db.Find(date);
+
+                    for (const auto &ev : events) {
+                        cout << ev << endl;
+                    }
                 }
-                else {
-                    cout << "Event not found" << endl;
-                }
+            } else if (command == "Print") {
+                db.Print();
             } else {
-                cout << "Deleted "
-                     << db.DeleteEvent(date, event)
-                     << " events" << endl;
+                throw runtime_error("Unknown command: " + command);
             }
-
-        } else if (command == "Find") {
-            cin >> date;
-
-            set<string> events = db.Find(date);
-
-            for (const auto& ev : events) {
-                cout << ev << endl;
-            }
-
-        } else if (command == "Print") {
-            db.Print();
-        } else {
-            throw runtime_error("Unknown command: " + command);
         }
+    }
+    catch (runtime_error& err) {
+        cout << err.what();
     }
 
     return 0;
