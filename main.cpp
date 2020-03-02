@@ -1,241 +1,159 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <algorithm>
-#include <string>
-#include <map>
-#include <set>
-#include <fstream>
-#include <iomanip>
-#include <sstream>
+
+#include <stdio.h>
+#include <cstdlib>
+#include <assert.h>
+
+#define DEBUG
+
+#define POISON 666
+
+#define VECTOR_OK() if (OK() != 0) {dump(); assert(!"ok");}
+
+
+enum Err {
+    E_OK,                   // stack is valid;
+    E_NULL_PTR_BUF,     // stack is pointed by NULL;
+    E_INVALID_SIZE,       // size is invalid;
+    E_INVALID_MAXSIZE,    // maxSize is invalid;
+};
+
+const char* errMessage[] = {
+        "vector is OK",
+        "buffer of vector is nullptr",
+        "maxSize is 0",
+        "size is more than maxSize",
+
+};
 
 using namespace std;
 
-struct Year {
-    int year;
+typedef int elem_t;
 
-    explicit Year(int y) {
-        year = y;
-    }
-};
-
-struct Month {
-    int month;
-
-    explicit Month(int m) {
-        month = m;
-    }
-};
-
-struct Day {
-    int day;
-
-    explicit Day(int d) {
-        day = d;
-    }
-};
-
-class Date {
-public:
-
-    Date (Year y = Year(1), Month m = Month(1), Day d = Day(1)) {
-        if (m.month < 1 || m.month > 12) {
-            throw runtime_error("Month value is invalid: " + to_string(m.month));
-        }
-
-        if (d.day < 1 || d.day > 31) {
-            throw runtime_error("Day value is invalid: " + to_string(d.day));
-        }
-
-        year  = y.year;
-        month = m.month;
-        day   = d.day;
-
-    }
-    int GetYear() const {
-        return year;
-    };
-    int GetMonth() const {
-        return month;
-    };
-    int GetDay() const {
-        return day;
-    };
-
+struct Vector {
 private:
-    int year;
-    int month;
-    int day;
+    elem_t *buf_;
+    size_t size_;
+    size_t maxSize_;
+
+    int errNo_;
+    int OK();
+    void dump() const;
+public:
+    explicit Vector(int newMaxSize);
+    ~Vector();
+    elem_t & operator [](int index);
 };
 
 
-istream& operator >> (istream& stream, Date& date) {
-    string strdate;
 
-    stream >> strdate;
+Vector::Vector(int newMaxSize)
+        :
+        buf_( (elem_t *)calloc(newMaxSize, sizeof(*buf_)) ),
+        size_(0),
+        maxSize_(newMaxSize),
+        errNo_(E_OK) {
 
-    stringstream new_stream;
 
-    new_stream << strdate;
+#ifdef DEBUG
+    VECTOR_OK();
+#else
+    assert(buf_ != nullptr);
+#endif
+    assert(newMaxSize > 0);
 
-    int d = 0, m = 0, y = 0;
-    char c1, c2;
-
-    new_stream >> y >> c1 >> m >> c2 >> d;
-    if (!new_stream                ||
-        c1 != '-' || c2 != '-' ||
-        new_stream.peek() != EOF) {
-        throw runtime_error("Wrong date format: " + strdate);
-    }
-
-    date = {Year(y), Month(m), Day(d)};
-
-    return stream;
 }
 
+Vector::~Vector() {
 
-ostream& operator << (ostream& stream, const Date& date) {
-    stream << setw(4) << setfill('0') << date.GetYear()  << '-'
-           << setw(2) << setfill('0') << date.GetMonth() << '-'
-           << setw(2) << setfill('0') << date.GetDay();
-
-    return stream;
+    free(buf_);
+    buf_ = nullptr;
+    size_ = POISON;
+    maxSize_ = POISON;
 }
 
-bool operator == (const Date& d1, const Date& d2) {
+elem_t & Vector::operator [](int index) {
+#ifdef DEBUG
+    VECTOR_OK();
+#else
+    assert(index >= 0);
+    assert(index < size_);
+#endif
 
-    return d1.GetYear()  == d2.GetYear()  &&
-           d1.GetMonth() == d2.GetMonth() &&
-           d1.GetDay()   == d2.GetDay();
+    return buf_[index];
 }
 
-bool operator < (const Date& d1, const Date& d2) {
-    int year1 = d1.GetYear();
-    int year2 = d2.GetYear();
-
-    int month1 = d1.GetMonth();
-    int month2 = d2.GetMonth();
-
-    int day1 = d1.GetDay();
-    int day2 = d2.GetDay();
-
-    if (year1 == year2) {
-        if (month1 == month2) {
-            return day1 < day2;
-        } else {
-            return month1 < month2;
-        }
-    }
-    return year1 < year2;
+int Vector::OK () {
+    if (buf_ == nullptr) {
+        errNo_ = E_NULL_PTR_BUF;
+        return E_NULL_PTR_BUF;
 }
 
-bool operator<(const Date& lhs, const Date& rhs);
-
-class Database {
-public:
-    void AddEvent(const Date &date, const string &event) {
-        dataBase[date].insert(event);
+    if (maxSize_  == 0) {
+        errNo_ = E_INVALID_MAXSIZE;
+        return E_INVALID_MAXSIZE;
     }
 
-    bool DeleteEvent(const Date &date, const string &event) {
-        if (dataBase.count(date) != 0 && dataBase[date].count(event) != 0) {
-            dataBase[date].erase(event);
-            return true;
-        }
-        return false;
+    if (size_ > maxSize_) {
+        errNo_ = E_INVALID_SIZE;
+        return E_INVALID_SIZE;
     }
 
-    int DeleteDate(const Date &date) {
-        int numEvents = 0;
-        if (dataBase.count(date) != 0) {
-            numEvents = dataBase[date].size();
-            dataBase.erase(date);
-        }
-        return numEvents;
+    return E_OK;
+}
 
+void Vector::dump () const {
+
+    const char *filename = "dump.log";
+
+    FILE *fdump = fopen (filename, "a+");
+
+    if (fdump == nullptr) {
+        printf ("Can't open file %s", filename);
+        exit(1);
     }
 
-    set<string> Find(const Date& date) const {
-        if (dataBase.count(date) != 0) {
-            return dataBase.at(date);
-        }
 
-        return {};
+    if (errNo_ == E_OK) {
+        fprintf(fdump, "%s", errMessage[errNo_]);
+    }
+    else {
+        fprintf(fdump, "!!!ERROR <%d>: %s !!!\n",
+                errNo_,
+                errMessage[errNo_]);
     }
 
-    void Print() const {
-        for (const auto& m : dataBase) {
-            for(const auto& s : m.second) {
-                cout << m.first << ' ' << s << endl;
+    fprintf(fdump, " [%p] {\n"
+                   "  current size     = %d\n"
+                   "  maximum capacity = %d\n"
+                   "  errno            = %d\n"
+                   "  data[%d]         = [%p]:\n",
+                   this,
+                   size_,
+                   maxSize_,
+                   errNo_,
+                   size_,
+                   buf_);
+
+
+    if (buf_ != nullptr) {
+        for (int i = 0; i < maxSize_; i++) {
+            if (i < size_) {
+                fprintf(fdump, "   *[%d] = %d\n", i, buf_[i]);
+            } else {
+                fprintf(fdump, "    [%d] = %d\n", i, buf_[i]);
             }
         }
     }
+    else {
+        fprintf(fdump, "   NO DATA\n");
+    }
 
-private:
-    map<Date, set<string>> dataBase;
-};
+    fprintf(fdump, "}\n");
+
+    fclose (fdump);
+}
+
 
 int main() {
-    Database db;
-
-    string command;
-    try {
-        while (getline(cin, command)) {
-
-            if (command.empty()) {
-                continue;
-            }
-
-            stringstream stream;
-            stream << command;
-
-            Date date;
-            string event;
-            stream >> command;
-
-            if (command == "Add" ||
-                command == "Del" ||
-                command == "Find") {
-                stream >> date >> event;
-
-                if (command == "Add") {
-
-                    db.AddEvent(date, event);
-
-                } else if (command == "Del") {
-
-                    if (event.empty()) {
-                        cout << "Deleted "
-                             << db.DeleteDate(date)
-                             << " events" << endl;
-
-                    } else {
-
-                        if (db.DeleteEvent(date, event)) {
-                            cout << "Deleted successfully" << endl;
-                        } else {
-                            cout << "Event not found" << endl;
-                        }
-                    }
-
-                } else if (command == "Find") {
-
-                    set<string> events = db.Find(date);
-
-                    for (const auto &ev : events) {
-                        cout << ev << endl;
-                    }
-                }
-            } else if (command == "Print") {
-                db.Print();
-            } else {
-                throw runtime_error("Unknown command: " + command);
-            }
-        }
-    }
-    catch (runtime_error& err) {
-        cout << err.what();
-    }
-
-    return 0;
+    Vector v(-1);
 }
